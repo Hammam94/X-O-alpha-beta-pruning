@@ -7,8 +7,9 @@ var objects = new Array(9);
 var check = new Array(9);
 var playerTurn = true;
 var whoStart = true;
-var rot = new Node();
+var rot;
 var counter = 0;
+var loseIndex, winIndex, drawIndex;
 
 var Context = {
 	canvas : null,
@@ -34,11 +35,13 @@ function doMouseDown(){
 	if(playerTurn){
 		var X = event.pageX;
 		var Y = event.pageY;
+		var index;
 		for(var i = 0 ; i < 9 ; i++){
 			if(objects[i].havePoint(X, Y) && check[i] == 0){
-				objects[i].image = oImg;
+				objects[i].image = xImg;
 				objects[i].draw();
-				check[i] = -1;
+				check[i] = 1;
+				index = i;
 				break;
 			}
 		}
@@ -47,79 +50,110 @@ function doMouseDown(){
 			if(check[i] == 0) ++emptyIndexes;
 		}
 		playerTurn = false;
+		rot = new Node();
 		rot.value = check.slice();
 		rot.level = true;
 		rot.v = -1000;
+		rot.alpha = 1000;
+		rot.beta = -1000;
 		rot.roott = true;
-		
-		var x = dfs(rot,emptyIndexes);
-		console.log("incoming x: " +x);
+		rot.index = index;
+		//console.log(rot);
+		minmax(rot, emptyIndexes);
+		var c = rot.getChildern();
+		console.log(c.length);
+		for(var i = 0 ; i < c.length; i++){
+			console.log(c[i]);
+		}
 		console.log("counter: " + counter);
-		objects[x].image = xImg;
-		objects[x].draw();
-		check[x] = 1;
+
 		playerTurn = true;
+		
+		// check[x] = 1;
+		// console.log(check);
+		// objects[x].image = xImg;
+		// objects[x].draw();		
 		
 	}
 }
 
 var counter = 0;
-function dfs(node, emptyIndexes){
-	for(var i = 0; i < 9 ; i++){
-		if(node.v == 1 && node.level && !node.roott){
-			parentVSet(node.getParent(), node.v);
-			return 1;
-		}else if(node.v == -1 && !node.level  && !node.roott){
-			parentVSet(node.getParent(), node.v);
-			return -1;
-		}else if(node.v == 0 && (emptyIndexes == 0 || i + 1 >= node.value.length)  && !node.roott){
-			parentVSet(node.getParent(), node.v);
-			return 0;
+function minmax(parent, emptyIndexes){
+	counter++;
+	var won = checkWon(parent.value, parent.index);
+	if(won && parent.level){
+		parent.v = 1;
+		parent.alpha = 1;
+		parent.beta = 1;
+		return parent.v;
+	}else if(won && !parent.level){
+		parent.v = -1;
+		parent.alpha = -1;
+		parent.beta = -1;
+		return parent.v;
+	}else if(emptyIndexes == 0){
+		parent.v = 0;
+		parent.alpha = 0;
+		parent.beta = 0;
+		return parent.v;
+	}else {
+		var childern = createChildern(parent);
+		for( var i = 0 ; i < childern.length ; i++){
+			var value = minmax(childern[i], emptyIndexes -1);
+			parentVSet(childern[i], value);
+			parentVSet(parent,value);
 		}
-		if(node.value[i] == 0){
-			var childNode = new Node();
-			childNode.value = node.value.slice();
-			childNode.level = !node.level;
-			childNode.roott = false;
-			
-			if(childNode.level){
-				childNode.value[i] = 1;
-				childNode.v = -1000;
-			}else{
-				childNode.value[i] = -1;
-				childNode.v = 1000;
-			}
-			var won = checkWon(childNode.value, i);
-			if(won && !childNode.level){
-				childNode.v = 1;
-				parentVSet(node,childNode.v);
-				if(!node.roott) parentVSet(node.getParent(), node.v);
-			
-			}else if(won && childNode.level){
-				childNode.v = -1;
-				parentVSet(node,childNode.v);
-				if(!node.roott) parentVSet(node.getParent(), node.v);
-			
-			}else if(emptyIndexes == 0 ){
-				childNode.v = 0;
-				parentVSet(node,childNode.v);
-				if(!node.roott) parentVSet(node.getParent(), node.v);
-			}
-			node.addChildern(childNode);
-			dfs(childNode, emptyIndexes - 1);
-			if(node.roott && node.v == 1) { console.log(" i : " + i); return i;}
-			if(node.roott) console.log("IN: " + i + "  /// node v:  " + node.v);
-			if(node.roott)counter++;
-		}
-		if(node.roott) console.log("out: " + i + "  / node v:  " + node.v);
 	}
+
+	return parent.v;
 }
 
+function createChildern(parent){
+	for(var i = 0; i < 9 ; i++){
+		if(parent.value[i] == 0){
+			var child = new Node();
+			child.value = parent.value.slice();
+			child.level = !parent.level;
+			child.roott = false;
+			child.index = i;
+
+			if(child.level) {
+				child.v = -1000;
+				child.alpha = parent.alpha;
+				child.beta = parent.beta;
+				child.value[i] = 1;
+			}else{
+				child.v = 1000;
+				child.alpha = parent.alpha;
+				child.beta = parent.beta;
+				child.value[i] = -1;
+			}
+			parent.addChildern(child);
+		}
+	}
+	return parent.getChildern();
+}
 function parentVSet(node, vValue){
 	if(node.level){
-		if(node.v < vValue) node.v = vValue; 
+		if(node.v < vValue) {
+			node.beta = node.v;
+			node.v = vValue;
+			node.alpha = vValue;
+		}
+		else {
+			node.alpha = node.v;
+			if(vValue < node.beta) node.beta = vValue;
+		} 
 	}else{
-		if(node.v > vValue) node.v = vValue;
+		if(node.v > vValue){ 
+			node.alpha = node.v;
+			node.v = vValue;
+			node.beta = vValue;
+		}
+		else{
+			node.beta = node.v;
+			if(vValue > node.alpha) node.alpha = vValue;
+		}
 	}
 }
 
@@ -208,8 +242,10 @@ function Node(){
 	var childern = new Array();
 	var parent = null;
 	var v, level;
+	var alpha, beta;
 	var roott;
-	var visited;
+	var index;
+
 	this.setParent = function(node){
 		this.parent = node;
 	}
@@ -221,7 +257,6 @@ function Node(){
 		childern.push(node);
 	}
 	this.getChildern = function(){
-		console.log(childern);
 		return childern;
 	}
 }
