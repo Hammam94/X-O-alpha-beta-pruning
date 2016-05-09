@@ -36,160 +36,92 @@ function doMouseDown(){
 		var X = event.pageX;
 		var Y = event.pageY;
 		var index;
-		for(var i = 0 ; i < 9 ; i++){
-			if(objects[i].havePoint(X, Y) && check[i] == 0){
-				objects[i].image = xImg;
-				objects[i].draw();
-				check[i] = 1;
-				index = i;
-				break;
+		if(checkWon(check) == 0){
+			for(var i = 0 ; i < 9 ; i++){
+				if(objects[i].havePoint(X, Y) && check[i] == 0){
+					objects[i].image = xImg;
+					objects[i].draw();
+					check[i] = 1;
+					index = i;
+					break;
+				}
+			}
+			var emptyIndexes = 0;
+			for (var i = check.length - 1; i >= 0; i--) {
+				if(check[i] == 0) ++emptyIndexes;
 			}
 		}
-		var emptyIndexes = 0;
-		for (var i = check.length - 1; i >= 0; i--) {
-			if(check[i] == 0) ++emptyIndexes;
-		}
-		playerTurn = false;
-		rot = new Node();
-		rot.value = check.slice();
-		rot.level = true;
-		rot.v = -1000;
-		rot.alpha = 1000;
-		rot.beta = -1000;
-		rot.roott = true;
-		rot.index = index;
-		//console.log(rot);
-		minmax(rot, emptyIndexes);
-		var c = rot.getChildern();
-		console.log(c.length);
-		for(var i = 0 ; i < c.length; i++){
-			console.log(c[i]);
-		}
-		console.log("counter: " + counter);
-
-		playerTurn = true;
-		
-		// check[x] = 1;
-		// console.log(check);
-		// objects[x].image = xImg;
-		// objects[x].draw();		
-		
+		playerTurn = false;	
+		if(emptyIndexes != 0 && checkWon(check) == 0){	
+			rot = new Node();
+			rot.value = check.slice();
+			rot.level = true;
+			rot.v = -1000;
+			rot.alpha = -1000;
+			rot.beta = 1000;
+			rot.roott = true;
+			rot.index = index;
+			minmax(rot, emptyIndexes);
+			playerTurn = true;		
+			check[rot.index] = -1;
+			objects[rot.index].image = oImg;
+			objects[rot.index].draw();	
+		}	
 	}
 }
 
-var counter = 0;
 function minmax(parent, emptyIndexes){
-	counter++;
-	var won = checkWon(parent.value, parent.index);
-	if(won && parent.level){
-		parent.v = 1;
-		parent.alpha = 1;
-		parent.beta = 1;
+	var won = checkWon(parent.value);
+	if(won != 0){
+		if(won == 1)parent.v = -1;
+		else parent.v = 1;
 		return parent.v;
-	}else if(won && !parent.level){
-		parent.v = -1;
-		parent.alpha = -1;
-		parent.beta = -1;
-		return parent.v;
-	}else if(emptyIndexes == 0){
+	}else if(won == 0 && emptyIndexes == 0){
 		parent.v = 0;
-		parent.alpha = 0;
-		parent.beta = 0;
 		return parent.v;
 	}else {
-		var childern = createChildern(parent);
-		for( var i = 0 ; i < childern.length ; i++){
-			var value = minmax(childern[i], emptyIndexes -1);
-			parentVSet(childern[i], value);
-			parentVSet(parent,value);
-		}
-	}
-
-	return parent.v;
-}
-
-function createChildern(parent){
-	for(var i = 0; i < 9 ; i++){
-		if(parent.value[i] == 0){
-			var child = new Node();
-			child.value = parent.value.slice();
-			child.level = !parent.level;
-			child.roott = false;
-			child.index = i;
-
-			if(child.level) {
-				child.v = -1000;
-				child.alpha = parent.alpha;
-				child.beta = parent.beta;
-				child.value[i] = 1;
-			}else{
-				child.v = 1000;
-				child.alpha = parent.alpha;
-				child.beta = parent.beta;
-				child.value[i] = -1;
+		for( var i = 0 ; i < 9 ; i++){
+			if(parent.value[i] == 0){
+				var child = createChild(parent,i);
+				var value = minmax(child, emptyIndexes -1);
+				if((parent.level && parent.v < value) || (!parent.level && parent.v > value)){
+					parent.v = value;
+					if(parent.roott) parent.index = child.index;
+				}
 			}
-			parent.addChildern(child);
 		}
+		return parent.v;
 	}
-	return parent.getChildern();
 }
-function parentVSet(node, vValue){
-	if(node.level){
-		if(node.v < vValue) {
-			node.beta = node.v;
-			node.v = vValue;
-			node.alpha = vValue;
-		}
-		else {
-			node.alpha = node.v;
-			if(vValue < node.beta) node.beta = vValue;
-		} 
+
+function createChild(parent, i){
+	var child = new Node();
+	child.value = parent.value.slice();
+	child.level = !parent.level;
+	child.roott = false;
+	child.index = i;
+
+	if(child.level) {
+		child.v = -1000;
+		child.value[i] = 1;
 	}else{
-		if(node.v > vValue){ 
-			node.alpha = node.v;
-			node.v = vValue;
-			node.beta = vValue;
-		}
-		else{
-			node.beta = node.v;
-			if(vValue > node.alpha) node.alpha = vValue;
-		}
+		child.v = 1000;
+		child.value[i] = -1;
 	}
+	return child;
 }
 
-function checkWon(value, index){
-	var row = Math.floor(index / 3);
-	var column = index % 3;
-
-	if(row == 0){
-		if(column == 0){
-			return (value[0] == value [1] && value[0] == value[2])||(value[0] == value [4] && value[0] == value[8])||(value[0] == value [3] && value[0] == value[6]);
-		}else if(column == 1) {
-			return (value[0] == value [1] && value[0] == value[2])||(value[1] == value [4] && value[1] == value[7]);
-		}else{
-			return (value[0] == value [1] && value[0] == value[2])||(value[2] == value [5] && value[2] == value[8])||(value[2] == value [4] && value[2] == value[6]);
-		}
-	}else if(row == 1){
-		if(column == 0){
-			return (value[3] == value [4] && value[3] == value[5])||(value[3] == value [0] && value[0] == value[6]);
-		}else if(column == 1) {
-			return (value[4] == value [1] && value[4] == value[7])||(value[4] == value [3] && value[4] == value[5]);
-		}else{
-			return (value[5] == value [4] && value[5] == value[3])||(value[5] == value [2] && value[5] == value[8]);
-			
-		}
-	}else{
-		if(column == 0){
-			return (value[6] == value [0] && value[6] == value[3])||(value[6] == value [4] && value[6] == value[2])||(value[6] == value [7] && value[6] == value[8]);
-		}else if(column == 1) {
-			return (value[7] == value [6] && value[7] == value[8])||(value[7] == value [4] && value[7] == value[1]);
-		}else{
-			return (value[8] == value [7] && value[8] == value[6])||(value[8] == value [4] && value[8] == value[0])||(value[8] == value [5] && value[8] == value[2]);
-		}
-	}
-	return false;
+function checkWon(value){
+	if(value[0] == value[1] && value[1] == value[2] && value[0] != 0) return value[0];
+	if(value[3] == value[4] && value[4] == value[5] && value[3] != 0) return value[3];
+	if(value[6] == value[7] && value[7] == value[8] && value[6] != 0) return value[6];
+	if(value[0] == value[3] && value[3] == value[6] && value[0] != 0) return value[0];
+	if(value[1] == value[4] && value[4] == value[7] && value[1] != 0) return value[1];
+	if(value[2] == value[5] && value[5] == value[8] && value[2] != 0) return value[2];
+	if(value[0] == value[4] && value[4] == value[8] && value[0] != 0) return value[0];
+	if(value[2] == value[4] && value[4] == value[6] && value[2] != 0) return value[2];
+	return 0;
 }
-
 
 var object = function() {
 	var x;
@@ -239,24 +171,9 @@ createStartObjects();
 
 function Node(){
 	var value;
-	var childern = new Array();
 	var parent = null;
 	var v, level;
 	var alpha, beta;
 	var roott;
 	var index;
-
-	this.setParent = function(node){
-		this.parent = node;
-	}
-	this.getParent = function(){
-		return this.parent;
-	}
-	this.addChildern = function(node){
-		node.setParent(this);
-		childern.push(node);
-	}
-	this.getChildern = function(){
-		return childern;
-	}
 }
