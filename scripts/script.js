@@ -6,10 +6,11 @@ var Iterator = 0;
 var objects = new Array(9);
 var check = new Array(9);
 var playerTurn = true;
-var whoStart = true;
 var rot;
-var counter = 0;
-var loseIndex, winIndex, drawIndex;
+var Random = 0;
+var Selected;
+var gameStarted = false;
+var diffcultyLevel;
 
 var Context = {
 	canvas : null,
@@ -30,54 +31,90 @@ function loadObjects(){
 
 	Context.canvas.addEventListener("mousedown", doMouseDown, false);
 };
-
-function doMouseDown(){
-	if(playerTurn){
-		var X = event.pageX;
-		var Y = event.pageY;
-		var index;
-		if(checkWon(check) == 0){
-			for(var i = 0 ; i < 9 ; i++){
-				if(objects[i].havePoint(X, Y) && check[i] == 0){
-					objects[i].image = xImg;
-					objects[i].draw();
-					check[i] = 1;
-					index = i;
-					break;
-				}
-			}
-			var emptyIndexes = 0;
-			for (var i = check.length - 1; i >= 0; i--) {
-				if(check[i] == 0) ++emptyIndexes;
+var counter = 0;
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+      x: evt.clientX - rect.left,
+      y: evt.clientY - rect.top
+    };
+}
+function doMouseDown(e){
+	if(!gameStarted){
+		gameStarted = true;
+		var Select = document.getElementById("MYSELECTION");
+    	diffcultyLevel = Select.options[Select.selectedIndex].value;
+    	console.log(diffcultyLevel);
+	}
+	var pos = getMousePos(Context.canvas, e);
+	var X = pos.x;
+	var Y = pos.y;
+	var index;
+	var flag = false;
+	var arr = [];
+	if(checkWon(check) 	== 0){
+		for(var i = 0 ; i < 9 ; i++){
+			if(objects[i].havePoint(X, Y) && check[i] == 0){
+				objects[i].image = xImg;
+				objects[i].draw();
+				check[i] = 1;
+				index = i;
+				flag =true;
+				break;
 			}
 		}
-		playerTurn = false;	
-		if(emptyIndexes != 0 && checkWon(check) == 0){	
+		var emptyIndexes = 0;
+		for (var i = check.length - 1; i >= 0; i--) {
+			if(check[i] == 0) {
+				++emptyIndexes;
+				arr.push(i);
+			}
+		}
+	}
+	if(emptyIndexes != 0 && checkWon(check) == 0 && flag){
+		flag = false;
+		if(Random == 0 && (diffcultyLevel == "Easy" || diffcultyLevel == "Medium")){
+			++Random;
+			var val = arr[Math.floor(Math.random() * arr.length)];
+			check[val] = -1;
+			objects[val].image = oImg;
+			objects[val].draw();	
+			console.log(check[val] +  "     " +val);
+		}else if(Random == 1 && diffcultyLevel == "Easy"){
+			++Random;
+			var val = arr[Math.floor(Math.random() * arr.length)];
+			check[val] = -1;
+			objects[val].image = oImg;
+			objects[val].draw();	
+			console.log(check[val] +  "     " +val);
+		}else{
 			rot = new Node();
 			rot.value = check.slice();
 			rot.level = true;
 			rot.v = -1000;
-			rot.alpha = -1000;
-			rot.beta = 1000;
+			rot.depth = 1000;
 			rot.roott = true;
 			rot.index = index;
-			minmax(rot, emptyIndexes);
-			playerTurn = true;		
+			counter++;
+			minmax(rot, emptyIndexes);	
 			check[rot.index] = -1;
 			objects[rot.index].image = oImg;
 			objects[rot.index].draw();	
-		}	
+		}
+		playerTurn = true;
 	}
-}
+};
 
 function minmax(parent, emptyIndexes){
 	var won = checkWon(parent.value);
 	if(won != 0){
 		if(won == 1)parent.v = -1;
 		else parent.v = 1;
+		parent.depth = 0;
 		return parent.v;
 	}else if(won == 0 && emptyIndexes == 0){
 		parent.v = 0;
+		parent.depth = 0;
 		return parent.v;
 	}else {
 		for( var i = 0 ; i < 9 ; i++){
@@ -86,8 +123,22 @@ function minmax(parent, emptyIndexes){
 				var value = minmax(child, emptyIndexes -1);
 				if((parent.level && parent.v < value) || (!parent.level && parent.v > value)){
 					parent.v = value;
-					if(parent.roott) parent.index = child.index;
+					if(parent.roott) parent.index = i;
+					if(parent.depth  > child.depth + 1 && parent.v == 1){
+						parent.depth = child.depth + 1;
+					} 
 				}
+				if(parent.level && parent.v <= value){
+					parent.v = value;
+					if(parent.depth  > child.depth + 1 && parent.v == 1){
+						parent.depth = child.depth + 1;
+						if(parent.depth == 1) parent.index = i;
+					} 
+				}
+				if( !parent.roott && ((parent.level && parent.v == 1) || (!parent.level && parent.v == -1))){
+					return parent.v;
+				}
+				if(parent.roott && parent.depth == 1 && parent.v == 1) return parent.v;
 			}
 		}
 		return parent.v;
@@ -100,6 +151,7 @@ function createChild(parent, i){
 	child.level = !parent.level;
 	child.roott = false;
 	child.index = i;
+	child.depth = 1000;
 
 	if(child.level) {
 		child.v = -1000;
@@ -128,7 +180,6 @@ var object = function() {
 	var y;
 	var arrIndex;
 	var image;
-	var player;
 	this.draw = function (){
 		ctx.drawImage(this.image, this.x, this.y, 166, 166);	
 	}
@@ -148,7 +199,6 @@ function createStartObjects(){
 		objects[Iterator].y = Yindex * 166;
 		objects[Iterator].arrIndex = arrayIndex;
 		objects[Iterator].image = backgroundImg;
-		objects[Iterator].player = whoStart;
 		++arrayIndex;
 		++Iterator;
 		if( Xindex == 2 && Yindex <2) {
@@ -173,7 +223,23 @@ function Node(){
 	var value;
 	var parent = null;
 	var v, level;
-	var alpha, beta;
 	var roott;
 	var index;
+	var depth;
 }
+
+
+	/*if(emptyIndexes != 0 && checkWon(check) == 0 && flag){	
+		flag = false;
+		rot = new Node();
+		rot.value = check.slice();
+		rot.level = true;
+		rot.v = -1000;
+		rot.roott = true;
+		rot.index = index;
+		minmax(rot, emptyIndexes);
+		playerTurn = true;		
+		check[rot.index] = -1;
+		objects[rot.index].image = oImg;
+		objects[rot.index].draw();	
+	}*/	
